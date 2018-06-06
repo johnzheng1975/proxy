@@ -16,6 +16,7 @@
 #include "src/envoy/http/jwt_auth/jwt_authenticator.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include <string.h>
 
 namespace Envoy {
 namespace Http {
@@ -59,7 +60,6 @@ void JwtAuthenticator::Verify(HeaderMap& headers,
   headers_ = &headers;
   callback_ = callback;
 
-  ENVOY_LOG(debug, "Jwt authentication starts");
   std::vector<std::unique_ptr<JwtTokenExtractor::Token>> tokens;
   store_.token_extractor().Extract(headers, &tokens);
   if (tokens.size() == 0) {
@@ -206,6 +206,15 @@ void JwtAuthenticator::VerifyKey(const PubkeyCacheItem& issuer_item) {
 }
 
 bool JwtAuthenticator::OkToBypass() {
+  const char* method = headers_->Method()->value().c_str();
+  const char* path = headers_->Path()->value().c_str();
+  if(Http::Headers::get().MethodValues.Options == method ||
+    strstr(path, "api/health") || 
+    strstr(path, "v1/health") ||
+    strstr(path, "api/liveness")){
+    ENVOY_LOG(info, "Jwt authentication bypass OPTION method and heath check request");
+    return true;
+  }
   for (const auto& bypass : store_.config().bypass_jwt()) {
     if (headers_->Method() && headers_->Path() &&
         // Http method should always match
