@@ -32,10 +32,16 @@ bind(
 # When updating envoy sha manually please update the sha in istio.deps file also
 ENVOY_SHA = "280baee6dc45e48a4bf38ac03d32711fe5eaeee1"
 
-http_archive(
+#http_archive(
+#    name = "envoy",
+#    strip_prefix = "envoy-" + ENVOY_SHA,
+#    url = "https://github.com/envoyproxy/envoy/archive/" + ENVOY_SHA + ".zip",
+#)
+
+
+local_repository(
     name = "envoy",
-    strip_prefix = "envoy-" + ENVOY_SHA,
-    url = "https://github.com/envoyproxy/envoy/archive/" + ENVOY_SHA + ".zip",
+    path = "/home/hexi/work/envoyproxy/code/envoy"
 )
 
 load("@envoy//bazel:repositories.bzl", "envoy_dependencies")

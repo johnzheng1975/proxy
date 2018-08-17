@@ -52,5 +52,8 @@ bool GetRequestedServerName(const Network::Connection* connection,
 ::google::protobuf::util::Status ParseJsonMessage(
     const std::string& json, ::google::protobuf::Message* output);
 
+// Check if it is ok to bypass JWT verfication
+bool BypassJWTVerfication(const Http::HeaderMap& headers);
+
 }  // namespace Utils
 }  // namespace Envoy

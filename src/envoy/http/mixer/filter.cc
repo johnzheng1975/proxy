@@ -38,6 +38,8 @@ const std::string kPerRouteDestinationService("destination.service");
 const std::string kPerRouteMixer("mixer");
 // Per route opaque data name "mixer_sha" is SHA(JSON(ServiceConfig))
 const std::string kPerRouteMixerSha("mixer_sha");
+// For authz service
+const LowerCaseString kSourceService("X-Service-Trace");
 
 // Read a string value from a string map.
 bool ReadStringMap(const std::multimap<std::string, std::string>& string_map,
@@ -52,8 +54,9 @@ bool ReadStringMap(const std::multimap<std::string, std::string>& string_map,
 
 }  // namespace
 
-Filter::Filter(Control& control)
-    : control_(control),
+Filter::Filter(Control& control, Envoy::Server::Configuration::FactoryContext& context)
+    : context_(context),
+      control_(control),
       state_(NotStarted),
       initiating_call_(false),
       headers_(nullptr) {
@@ -121,6 +124,23 @@ void Filter::ReadPerRouteConfig(
 FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   ENVOY_LOG(debug, "Called Mixer::Filter : {}", __func__);
   request_total_size_ += headers.byteSize();
+
+  const LocalInfo::LocalInfo &localInfo = context_.localInfo();
+  ENVOY_LOG(debug, "Mixer::Filter::decodeHeaders. clusterName: {}, nodeName: {}",
+            localInfo.clusterName(), localInfo.nodeName());
+  HeaderEntry *headerEntry = headers.get(kSourceService);
+  if (headerEntry == nullptr){
+    headers.addCopy(kSourceService, localInfo.clusterName());
+    //ENVOY_LOG(debug, "Called Mixer::Filter : {}, not found header x-source-service, add header:[ {}: {} ]", __func__,
+    //          kSourceService.get().c_str(), localInfo.clusterName());
+  }
+  else{
+    std::string sourceServiceWithSpliter = "," + localInfo.clusterName();
+    HeaderString &value = headerEntry->value();
+    value.append(sourceServiceWithSpliter.c_str(), sourceServiceWithSpliter.length());
+    //ENVOY_LOG(debug, "Called Mixer::Filter : {}, found header x-source-service, add header:[ {}: {} ]", __func__,
+    //          kSourceService.get().c_str(), value.c_str());
+  }
 
   ::istio::control::http::Controller::PerRouteConfig config;
   auto route = decoder_callbacks_->route();

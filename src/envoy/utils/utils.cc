@@ -15,6 +15,8 @@
 
 #include "src/envoy/utils/utils.h"
 #include "mixer/v1/attributes.pb.h"
+#include "common/http/utility.h"
+#include "common/http/headers.h"
 
 using ::google::protobuf::Message;
 using ::google::protobuf::Struct;
@@ -137,6 +139,19 @@ Status ParseJsonMessage(const std::string& json, Message* output) {
   ::google::protobuf::util::JsonParseOptions options;
   options.ignore_unknown_fields = true;
   return ::google::protobuf::util::JsonStringToMessage(json, output, options);
+}
+
+bool BypassJWTVerfication(const Http::HeaderMap &headers){
+  const char *method = headers.Method()->value().c_str();
+  const char *path = headers.Path()->value().c_str();
+  if (::Envoy::Http::Headers::get().MethodValues.Options == method ||
+      strstr(path, "api/health") ||
+      strstr(path, "v1/health") ||
+      strstr(path, "api/liveness") ||
+      strstr(path, "recommendations/widgets/aarw")){
+    return true;
+  }
+  return false;
 }
 
 }  // namespace Utils

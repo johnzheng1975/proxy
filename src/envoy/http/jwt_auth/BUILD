@@ -54,6 +54,7 @@ envoy_cc_library(
     deps = [
         ":jwt_lib",
         "//external:jwt_auth_config_cc_proto",
+        "//src/envoy/utils:utils_lib",
         "@envoy//source/exe:envoy_common_lib",
     ],
 )

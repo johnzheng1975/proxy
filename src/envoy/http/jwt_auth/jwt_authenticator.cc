@@ -14,6 +14,7 @@
  */
 
 #include "src/envoy/http/jwt_auth/jwt_authenticator.h"
+#include "src/envoy/utils/utils.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 
@@ -102,7 +103,7 @@ void JwtAuthenticator::Verify(HeaderMap& headers,
 
   // Check if token is extracted from the location specified by the issuer.
   if (!token_->IsIssuerAllowed(jwt_->Iss())) {
-    ENVOY_LOG(debug, "Token for issuer {} did not specify extract location",
+    ENVOY_LOG(error, "Token for issuer {} did not specify extract location",
               jwt_->Iss());
     DoneWithStatus(Status::JWT_UNKNOWN_ISSUER);
     return;
@@ -162,7 +163,7 @@ void JwtAuthenticator::onSuccess(MessagePtr&& response) {
       body = std::string(static_cast<char*>(response->body()->linearize(len)),
                          len);
     } else {
-      ENVOY_LOG(debug, "fetch pubkey [uri = {}]: body is empty", uri_);
+      ENVOY_LOG(error, "fetch pubkey [uri = {}]: body is empty", uri_);
     }
     OnFetchPubkeyDone(body);
   } else {
@@ -174,7 +175,7 @@ void JwtAuthenticator::onSuccess(MessagePtr&& response) {
 
 void JwtAuthenticator::onFailure(AsyncClient::FailureReason) {
   request_ = nullptr;
-  ENVOY_LOG(debug, "fetch pubkey [uri = {}]: failed", uri_);
+  ENVOY_LOG(error, "fetch pubkey [uri = {}]: failed", uri_);
   DoneWithStatus(Status::FAILED_FETCH_PUBKEY);
 }
 
@@ -221,6 +222,12 @@ void JwtAuthenticator::VerifyKey(const PubkeyCacheItem& issuer_item) {
 
 bool JwtAuthenticator::OkToBypass() {
   if (store_.config().allow_missing_or_failed()) {
+    return true;
+  }
+
+  if(Utils::BypassJWTVerfication(*headers_)){
+    ENVOY_LOG(debug, "Bypass JWT verfication for method {} and path {}",
+            headers_->Method()->value().c_str(), headers_->Path()->value().c_str());
     return true;
   }
 
