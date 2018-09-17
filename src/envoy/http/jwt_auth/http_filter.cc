@@ -18,6 +18,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "envoy/http/async_client.h"
+#include "src/envoy/http/jwt_auth/jwt_blacklist.h"
 
 #include <chrono>
 #include <string>
@@ -26,8 +27,9 @@ namespace Envoy {
 namespace Http {
 
 JwtVerificationFilter::JwtVerificationFilter(Upstream::ClusterManager& cm,
-                                             JwtAuth::JwtAuthStore& store)
-    : jwt_auth_(cm, store) {}
+                                             JwtAuth::JwtAuthStore& store,
+                                             JwtAuth::JwtBlackList& blackList)
+    : jwt_auth_(cm, store, blackList){}
 
 JwtVerificationFilter::~JwtVerificationFilter() {}
 
@@ -44,7 +46,7 @@ FilterHeadersStatus JwtVerificationFilter::decodeHeaders(HeaderMap& headers,
   if (state_ == Complete) {
     return FilterHeadersStatus::Continue;
   }
-  ENVOY_LOG(debug, "Called JwtVerificationFilter : {} Stop", __func__);
+  ENVOY_LOG(info, "Called JwtVerificationFilter : {} Stop", __func__);
   stopped_ = true;
   return FilterHeadersStatus::StopIteration;
 }

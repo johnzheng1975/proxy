@@ -17,6 +17,7 @@
 #include "src/envoy/utils/utils.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "src/envoy/http/jwt_auth/jwt_blacklist.h"
 
 namespace Envoy {
 namespace Http {
@@ -51,8 +52,9 @@ void ExtractUriHostPath(const std::string& uri, std::string* host,
 }  // namespace
 
 JwtAuthenticator::JwtAuthenticator(Upstream::ClusterManager& cm,
-                                   JwtAuthStore& store)
-    : cm_(cm), store_(store) {}
+                                   JwtAuthStore& store, JwtBlackList& blackList)
+    : cm_(cm), store_(store), blackList_(blackList) {
+    }
 
 // Verify a JWT token.
 void JwtAuthenticator::Verify(HeaderMap& headers,
@@ -91,6 +93,12 @@ void JwtAuthenticator::Verify(HeaderMap& headers,
     return;
   }
 
+  if(blackList_.isJwtInBlackList(*jwt_)){
+    ENVOY_LOG(error, "JWT is in black list.");
+    DoneWithStatus(Status::JWT_REVOKED);
+    return ;
+  }
+
   // Check "exp" claim.
   const auto unix_timestamp =
       std::chrono::duration_cast<std::chrono::seconds>(
@@ -103,8 +111,7 @@ void JwtAuthenticator::Verify(HeaderMap& headers,
 
   // Check if token is extracted from the location specified by the issuer.
   if (!token_->IsIssuerAllowed(jwt_->Iss())) {
-    ENVOY_LOG(error, "Token for issuer {} did not specify extract location",
-              jwt_->Iss());
+    ENVOY_LOG(error, "Token for issuer {} did not specify extract location", jwt_->Iss());
     DoneWithStatus(Status::JWT_UNKNOWN_ISSUER);
     return;
   }
@@ -112,17 +119,20 @@ void JwtAuthenticator::Verify(HeaderMap& headers,
   // Check the issuer is configured or not.
   auto issuer = store_.pubkey_cache().LookupByIssuer(jwt_->Iss());
   if (!issuer) {
+    ENVOY_LOG(error, "Unknow issuer.");
     DoneWithStatus(Status::JWT_UNKNOWN_ISSUER);
     return;
   }
 
   // Check if audience is allowed
   if (!issuer->IsAudienceAllowed(jwt_->Aud())) {
+    ENVOY_LOG(error, "Audience doesn't match.");
     DoneWithStatus(Status::AUDIENCE_NOT_ALLOWED);
     return;
   }
 
   if (issuer->pubkey() && !issuer->Expired()) {
+    ENVOY_LOG(info, "pubkey is already exist.");
     VerifyKey(*issuer);
     return;
   }
@@ -143,11 +153,12 @@ void JwtAuthenticator::FetchPubkey(PubkeyCacheItem* issuer) {
 
   const auto& cluster = issuer->jwt_config().remote_jwks().http_uri().cluster();
   if (cm_.get(cluster) == nullptr) {
+    ENVOY_LOG(error, "Fetch pubkey can not find cluster: {}", cluster);
     DoneWithStatus(Status::FAILED_FETCH_PUBKEY);
     return;
   }
 
-  ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", uri_);
+  ENVOY_LOG(info, "Fetch pubkey from [uri = {}], [cluster = {}]: start", uri_, cluster);
   request_ = cm_.httpAsyncClientForCluster(cluster).send(
       std::move(message), *this, absl::optional<std::chrono::milliseconds>());
 }
@@ -156,18 +167,18 @@ void JwtAuthenticator::onSuccess(MessagePtr&& response) {
   request_ = nullptr;
   uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
   if (status_code == 200) {
-    ENVOY_LOG(debug, "fetch pubkey [uri = {}]: success", uri_);
+    ENVOY_LOG(debug, "Fetch pubkey [uri = {}]: success", uri_);
     std::string body;
     if (response->body()) {
       auto len = response->body()->length();
       body = std::string(static_cast<char*>(response->body()->linearize(len)),
                          len);
     } else {
-      ENVOY_LOG(error, "fetch pubkey [uri = {}]: body is empty", uri_);
+      ENVOY_LOG(error, "Fetch pubkey [uri = {}]: body is empty", uri_);
     }
     OnFetchPubkeyDone(body);
   } else {
-    ENVOY_LOG(debug, "fetch pubkey [uri = {}]: response status code {}", uri_,
+    ENVOY_LOG(error, "Fetch pubkey [uri = {}]: response status code {}", uri_,
               status_code);
     DoneWithStatus(Status::FAILED_FETCH_PUBKEY);
   }
@@ -230,7 +241,6 @@ bool JwtAuthenticator::OkToBypass() {
             headers_->Method()->value().c_str(), headers_->Path()->value().c_str());
     return true;
   }
-
   // TODO: use bypass field
   return false;
 }
@@ -242,7 +252,8 @@ void JwtAuthenticator::DoneWithStatus(const Status& status) {
             "The value of allow_missing_or_failed in AuthFilterConfig is: {}",
             store_.config().allow_missing_or_failed());
   if (store_.config().allow_missing_or_failed()) {
-    callback_->onDone(JwtAuth::Status::OK);
+    //callback_->onDone(JwtAuth::Status::OK);
+    callback_->onDone(status);
   } else {
     callback_->onDone(status);
   }

@@ -29,7 +29,8 @@ class JwtVerificationFilter : public StreamDecoderFilter,
                               public Logger::Loggable<Logger::Id::filter> {
  public:
   JwtVerificationFilter(Upstream::ClusterManager& cm,
-                        JwtAuth::JwtAuthStore& store);
+                        JwtAuth::JwtAuthStore& store,
+                        JwtAuth::JwtBlackList& blackList);
   ~JwtVerificationFilter();
 
   // Http::StreamFilterBase

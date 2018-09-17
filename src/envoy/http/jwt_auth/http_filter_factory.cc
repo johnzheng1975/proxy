@@ -17,6 +17,8 @@
 #include "google/protobuf/util/json_util.h"
 #include "src/envoy/http/jwt_auth/auth_store.h"
 #include "src/envoy/http/jwt_auth/http_filter.h"
+#include "src/envoy/http/jwt_auth/jwt_blacklist.h"
+#include "common/common/logger.h"
 
 using ::istio::envoy::config::filter::http::jwt_auth::v2alpha1::
     JwtAuthentication;
@@ -25,8 +27,17 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-class JwtVerificationFilterConfig : public NamedHttpFilterConfigFactory {
+class JwtVerificationFilterConfig : public Logger::Loggable<Logger::Id::filter>, 
+                                    public NamedHttpFilterConfigFactory {
  public:
+  JwtVerificationFilterConfig(){
+      blackList_ = nullptr;
+  }
+  ~JwtVerificationFilterConfig(){
+      if(blackList_){
+          delete blackList_, blackList_ = nullptr;
+      }
+  }
   Http::FilterFactoryCb createFilterFactory(const Json::Object& config,
                                             const std::string&,
                                             FactoryContext& context) override {
@@ -51,16 +62,27 @@ class JwtVerificationFilterConfig : public NamedHttpFilterConfigFactory {
  private:
   Http::FilterFactoryCb createFilter(const JwtAuthentication& proto_config,
                                      FactoryContext& context) {
-    auto store_factory = std::make_shared<Http::JwtAuth::JwtAuthStoreFactory>(
-        proto_config, context);
-    Upstream::ClusterManager& cm = context.clusterManager();
-    return [&cm, store_factory](
-               Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamDecoderFilter(
-          std::make_shared<Http::JwtVerificationFilter>(
-              cm, store_factory->store()));
-    };
+      auto store_factory = std::make_shared<Http::JwtAuth::JwtAuthStoreFactory>(
+          proto_config, context);
+      Upstream::ClusterManager &cm = context.clusterManager();
+      Envoy::Http::JwtAuth::JwtBlackList *pBlackList = nullptr;
+      if (blackList_ == nullptr){
+          ENVOY_LOG(info, "JwtVerificationFilterConfig....create new black list.");
+          pBlackList = new Envoy::Http::JwtAuth::JwtBlackList(cm);
+          blackList_ = pBlackList;
+      }else{
+          ENVOY_LOG(info, "JwtVerificationFilterConfig....black list has been created.");
+          pBlackList = blackList_;
+      }
+      return [&cm, store_factory, pBlackList](
+                 Http::FilterChainFactoryCallbacks &callbacks) -> void {
+          callbacks.addStreamDecoderFilter(
+              std::make_shared<Http::JwtVerificationFilter>(
+                  cm, store_factory->store(), *pBlackList));
+      };
   }
+private:
+    Envoy::Http::JwtAuth::JwtBlackList* blackList_;
 };
 
 /**

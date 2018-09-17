@@ -131,15 +131,15 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   HeaderEntry *headerEntry = headers.get(kSourceService);
   if (headerEntry == nullptr){
     headers.addCopy(kSourceService, localInfo.clusterName());
-    //ENVOY_LOG(debug, "Called Mixer::Filter : {}, not found header x-source-service, add header:[ {}: {} ]", __func__,
-    //          kSourceService.get().c_str(), localInfo.clusterName());
+    ENVOY_LOG(debug, "Called Mixer::Filter : {}, not found header x-source-service, add header:[ {}: {} ]", __func__,
+              kSourceService.get().c_str(), localInfo.clusterName());
   }
   else{
     std::string sourceServiceWithSpliter = "," + localInfo.clusterName();
     HeaderString &value = headerEntry->value();
     value.append(sourceServiceWithSpliter.c_str(), sourceServiceWithSpliter.length());
-    //ENVOY_LOG(debug, "Called Mixer::Filter : {}, found header x-source-service, add header:[ {}: {} ]", __func__,
-    //          kSourceService.get().c_str(), value.c_str());
+    ENVOY_LOG(debug, "Called Mixer::Filter : {}, found header x-source-service, add header:[ {}: {} ]", __func__,
+              kSourceService.get().c_str(), value.c_str());
   }
 
   ::istio::control::http::Controller::PerRouteConfig config;

@@ -105,6 +105,9 @@ enum class Status {
 
   // Failed to fetch public key
   FAILED_FETCH_PUBKEY = 25,
+
+  // JWT toke is revoked 
+  JWT_REVOKED = 26,
 };
 
 std::string StatusToString(Status status);
@@ -230,6 +233,11 @@ class Jwt : public WithStatus {
   // not exist.
   int64_t Exp();
 
+  // They return a string (or base64url-encoded string) of the signature of
+  // the given JWT.
+  const std::string& Signature()const;
+  const std::string& SignatureBase64()const;
+
  private:
   const EVP_MD* md_;
 
@@ -240,6 +248,7 @@ class Jwt : public WithStatus {
   std::string payload_str_;
   std::string payload_str_base64url_;
   std::string signature_;
+  std::string signature_base64_;
   std::string alg_;
   std::string kid_;
   std::string iss_;

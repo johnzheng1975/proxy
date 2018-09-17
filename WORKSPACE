@@ -38,6 +38,12 @@ ENVOY_SHA = "280baee6dc45e48a4bf38ac03d32711fe5eaeee1"
 #    url = "https://github.com/envoyproxy/envoy/archive/" + ENVOY_SHA + ".zip",
 #)
 
+#new_local_repository(
+#    name = "nats",
+#    path = "/usr/lib",
+#    build_file = "nats_lib.BUILD"
+#)
+#
 
 local_repository(
     name = "envoy",
