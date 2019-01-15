@@ -25,7 +25,7 @@ namespace Utils {
 namespace {
 
 // gRPC request timeout
-const std::chrono::milliseconds kGrpcRequestTimeoutMs(5000);
+const std::chrono::milliseconds kGrpcRequestTimeoutMs(600000);
 
 }  // namespace
 

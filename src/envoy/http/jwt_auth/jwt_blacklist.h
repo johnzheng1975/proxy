@@ -23,10 +23,17 @@
 #include "nats/nats.h"
 #include <mutex>
 #include <condition_variable>
+#include <list>
 
 namespace Envoy {
 namespace Http {
 namespace JwtAuth {
+
+typedef struct _RevokedJWT
+{
+  std::string token;
+  long expireAt;
+} RevokedJWT;
 
 class Jwt;
 // A per-request JWT authenticator to handle all JWT authentication:
@@ -34,45 +41,54 @@ class Jwt;
 class JwtBlackList : public Logger::Loggable<Logger::Id::filter>,
                      public AsyncClient::Callbacks{
  public:
-   JwtBlackList(Upstream::ClusterManager& cm);
+   JwtBlackList(Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher);
    ~JwtBlackList();
  public:
-   // initialize members from environment variableis
-   void init();
-   // Fetch a revoked JWTs.
-   void FetchJWTBlackList();
+   // Check if JWT is in black list
+   bool IsJwtInBlackList(const std::string& token);
 
    // Check if JWT is in black list
-   bool isJwtInBlackList(const std::string& token);
-
-   // Check if JWT is in black list
-   bool isJwtInBlackList(const Jwt& jwt);
+   bool IsJwtInBlackList(const Jwt& jwt);
  private:
+   //Override methods of AsyncClient::Callbacks
    void onSuccess(MessagePtr &&response);
    void onFailure(AsyncClient::FailureReason);
 
+   //Initialize members from environment variableis
+   void Init();
+
+   void OAuthClusterName(const std::string &oauthHost, std::string &clusterName) const;
+   // Fetch revoked JWTs.
+   void FetchJWTBlackList();
+
    // Handle the public key fetch done event.
-   void OnFetchBlacklistDone(const std::string& body);
+   void OnFetchBlackListDone(const std::string& body);
 
-   void sendRequest();
+   void SendRequest();
 
-   void addRevokedJwt(const std::string& token);
+   void AddRevokedJwt(const RevokedJWT& token);
+
  private:
-   void oauthClusterName(const std::string &oauthHost, std::string &clusterName) const;
+   //Timer
+   void CreateFetchBlackListTimer();
+   void CreateCleanExpriedTokenTimer();
+   void OnCleanExpiredTokenTimer();
+   void OnFetchBlackListTimer();
+ private:
    // Nats
-   int parseNatsServerUrls(char*** serverUrls); 
-   void freeNatsServerUrls(char** serverUrls, int count);
-   void connectNats();
-   void closeNats();
-   void parseNatsMsg(const char* msg, std::string& token);
-   static void onMsg(stanConnection *sc, stanSubscription *sub, const char *channel, stanMsg *msg, void *closure);
-   static void connectionLostCB(stanConnection *sc, const char *errTxt, void *closure);
+   int ParseNatsServerUrls(char ***serverUrls);
+   void FreeNatsServerUrls(char **serverUrls, int count);
+   void ConnectNats();
+   void CloseNats();
+   void ParseNatsMsg(const char *msg, RevokedJWT &jwt);
+   static void OnMsg(stanConnection *sc, stanSubscription *sub, const char *channel, stanMsg *msg, void *closure);
+   static void ConnectionLostCB(stanConnection *sc, const char *errTxt, void *closure);
 
  private:
    // The cluster manager object to make HTTP call.
    Upstream::ClusterManager &cm_;
 
-   std::vector<std::string> blacklist_;
+   std::list<RevokedJWT> blacklist_;
    // The pending remote request so it can be canceled.
    AsyncClient::Request *request_{};
 
@@ -87,8 +103,11 @@ class JwtBlackList : public Logger::Loggable<Logger::Id::filter>,
    std::string natsPassword_;
 
    std::mutex mutex_;
-};
 
+   Event::Dispatcher &dispatcher_;
+   Event::TimerPtr clean_timer_;
+   Event::TimerPtr fetch_timer_;
+};
 }  // namespace JwtAuth
 }  // namespace Http
 }  // namespace Envoy

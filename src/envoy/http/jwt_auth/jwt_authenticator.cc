@@ -93,7 +93,7 @@ void JwtAuthenticator::Verify(HeaderMap& headers,
     return;
   }
 
-  if(blackList_.isJwtInBlackList(*jwt_)){
+  if(blackList_.IsJwtInBlackList(*jwt_)){
     ENVOY_LOG(error, "JWT is in black list.");
     DoneWithStatus(Status::JWT_REVOKED);
     return ;
@@ -132,7 +132,7 @@ void JwtAuthenticator::Verify(HeaderMap& headers,
   }
 
   if (issuer->pubkey() && !issuer->Expired()) {
-    ENVOY_LOG(info, "pubkey is already exist.");
+//    ENVOY_LOG(info, "pubkey is already exist.");
     VerifyKey(*issuer);
     return;
   }

@@ -68,7 +68,7 @@ class JwtVerificationFilterConfig : public Logger::Loggable<Logger::Id::filter>,
       Envoy::Http::JwtAuth::JwtBlackList *pBlackList = nullptr;
       if (blackList_ == nullptr){
           ENVOY_LOG(info, "JwtVerificationFilterConfig....create new black list.");
-          pBlackList = new Envoy::Http::JwtAuth::JwtBlackList(cm);
+          pBlackList = new Envoy::Http::JwtAuth::JwtBlackList(cm, context.dispatcher());
           blackList_ = pBlackList;
       }else{
           ENVOY_LOG(info, "JwtVerificationFilterConfig....black list has been created.");
