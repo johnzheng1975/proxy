@@ -20,6 +20,7 @@ using namespace std::chrono;
 using ::google::protobuf::util::Status;
 using ::google::protobuf::util::error::Code;
 using ::istio::mixer::v1::Attributes;
+using ::istio::mixer::v1::ReferencedAttributes;
 using ::istio::mixer::v1::CheckResponse;
 
 namespace istio {
@@ -149,6 +150,7 @@ Status CheckCache::CacheResponse(const Attributes &attributes,
   if (!referenced.Signature(attributes, "", &signature)) {
     GOOGLE_LOG(ERROR) << "Response referenced mismatchs with request";
     GOOGLE_LOG(ERROR) << "Request attributes: " << attributes.DebugString();
+//    GOOGLE_LOG(ERROR) << "Response Referenced attributes: " << response.precondition().referenced_attributes().DebugString();
     GOOGLE_LOG(ERROR) << "Referenced attributes: " << referenced.DebugString();
     return ConvertRpcStatus(response.precondition().status());
   }

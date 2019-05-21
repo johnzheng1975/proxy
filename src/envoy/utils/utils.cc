@@ -149,7 +149,8 @@ bool BypassJWTVerfication(const Http::HeaderMap &headers){
       strstr(path, "v1/health") ||
       strstr(path, "api/liveness") ||
       strstr(path, "prometheus") ||
-      strstr(path, "recommendations/widgets/aarw")){
+      strstr(path, "recommendations/widgets/aarw") ||
+      strstr(path, "safesize/widgets/aarw")){
     return true;
   }
   return false;
