@@ -55,7 +55,7 @@ echo "Build envoy."
 result=`make BAZEL_BUILD_ARGS="-c opt"`
 if [ "$result" != "" ]; then
 echo "make result: $result"
-exit 1
+#exit 1
 fi
 
 cd $ENVOY_BIN_DIR
